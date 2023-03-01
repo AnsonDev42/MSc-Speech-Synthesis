@@ -18,7 +18,7 @@ print(pl)
 
 def create_diphone_list():
     """
-    create a file for storing all possible diphones ???TODO: check needed and how to get the rank?
+    create a file for storing all possible diphones
     :return:
     """
     all_phones = load_standard_phonelist()
@@ -45,67 +45,95 @@ def phone_to_diphone(phone_list=[]):
     return diphone_list
 
 
-def load_phone_list():
+def load_books_phone_list(diphone=True, create=False):
     """
+        create dic for each sentence to a list of phones and a dic for a list of diphones
+        if exists, load from pickle file depending on param diphone
 
-    TODO: for now its phone list.... FIX IT TO diphone
-    :return:
+    :return: a dictionary of sentence index to a list of phones
     """
 
     import pickle
     sentence2diphones = {}
-    with open('sentence2diphones.pkl', 'rb') as f:
-        sentence2diphones = pickle.load(f)
-        if sentence2diphones:
-            return sentence2diphones
+    sentence2phones = {}
+    if not create:
+        try:
+            if not diphone:
+                with open('sentence2phones.pkl', 'rb') as f:
+                    sentence2phones = pickle.load(f)
+                    if sentence2phones:
+                        return sentence2phones
+            else:
+                with open('sentence2diphones.pkl', 'rb') as f:
+                    sentence2diphones = pickle.load(f)
+                    if sentence2diphones:
+                        return sentence2diphones
+        except:
+            print('pickle file not found, creating new one')
 
     with open('utts_train.mlf', 'r') as f:
         lines = f.readlines()
-    sentence_index = -1
-    tmp_diphones = []
+    sentence_index = -1  # palceholder, remove later
+    tmp_phone_list = []
+    tmp_diphone_list = []
     for line in lines:
         if line.startswith('#!MLF!#'):
-            sentence2diphones[sentence_index] = tmp_diphones
-            tmp_diphones = []
+            sentence2phones[sentence_index] = tmp_phone_list
+            sentence2diphones[sentence_index] = phone_to_diphone(tmp_phone_list)
+            tmp_phone_list = []
             continue
         if line.startswith('"*/'):
             # get the sentence index such as "*/c_books_train_0001.lab" to 1
             sentence_index = int(line.split('_')[-1].split('.')[0])
             continue
-        tmp_diphones.append(line.strip())
-    sentence2diphones.remove(-1)  # remove the first empty element
+        tmp_phone_list.append(line.strip())
+    sentence2phones.pop(-1)
+    sentence2diphones.pop(-1)  # remove the first empty element
 
     # create a binary pickle file
     f = open("sentence2diphones.pkl", "wb")
-    # write the python object (dict) to pickle file
     pickle.dump(sentence2diphones, f)
     f.close()
-    return sentence2diphones
+    f = open("sentence2phones.pkl", "wb")
+    pickle.dump(sentence2phones, f)
+    f.close()
+
+    if diphone:
+        return sentence2diphones
+    return sentence2phones
 
 
-def greedy_picker(sentences=[]):
+def get_distribution(diphone=False):
+    standarded_phonelist = load_standard_phonelist(diphone=diphone)
+    sentence2phone = load_books_phone_list(diphone=diphone)
+    # now only for phones
+    distribution = {}
+    for sentence in sentence2phone.keys():
+        for phone in sentence2phone[sentence]:
+            if phone in distribution:
+                distribution[phone] += 1
+            else:
+                distribution[phone] = 1
+
+    # rank the distribution and print it
+    # distribution = sorted(distribution.items(), key=lambda x: x[1], reverse=False)
+    print(distribution)
+    return distribution
+
+
+def greedy_picker(num_sentences=100):
     """"
     this function will pick the sentences that are most valuable to the system
     in a greedy manner, only check a few sentences at a time
 
     """
-    if not sentences:
-        train_sentences = get_data('train')
-    assert len(train_sentences) > 0
-    # pick the first sentence
 
-    # pretend to have a dictionrary with scores: {'aa':20, 'bb':19, 'cc':18, ...}
-    scores = {}
+    current_sentences_set = set()  # only store the index of the sentence in the train_sentences
+    sentence2phone = load_books_phone_list()
+    assert len(sentence2phone) > 0
 
-    # another dictionary record if the sentence has been picked: {'aa':True, 'bb':False, 'cc':False, ...}
-    picked = {}
-    current_sentences = 0
-    current_sentences_set = {}  # only store the index of the sentence in the train_sentences
-
-    # create a priority queue to store the sentence index and its score
-    import heapq
-    sentence_score_queue = []
-    sentence2phone = load_phone_list()
+    distribution = get_distribution(diphone=True)
+    seen_diphone = set()
 
     def get_diphones(sentence_idx):
         # get the diphones of the sentence
@@ -113,39 +141,71 @@ def greedy_picker(sentences=[]):
         diphones = phone_to_diphone(phones)
         return diphones
 
-    def score_sentence(index):
+    def score_sentence(sentence_idx):
         # obtain the diphones of the sentence
-        diphones = get_diphones(index)
+        diphones = get_diphones(sentence_idx)
+        local_seen_diphone = set()
         score = 0
-        max_unseen_diphone_reward = 0  # maybe remove this but giving heavy reward to unseen diphones
         for diphone in diphones:
-            score += scores[diphone]
-            if not picked[diphone] and scores[diphone] > max_unseen_diphone_reward:
-                max_unseen_diphone_reward = scores[diphone]
+            score += 1.0 / distribution[diphone]
+            if diphone not in seen_diphone and diphone not in local_seen_diphone:
+                local_seen_diphone.add(diphone)
+                score += 10.0 / distribution[diphone]
+
         score /= len(diphones)
 
-        return score, max_unseen_diphone_reward
+        return score, local_seen_diphone
 
-    def pick1(sentences):
+    def pick1(num_candidates=10):
         # randomly pick 10 sentences, and score them with normalisation:
         # ((12+15+3 .. )+( if it hitted the first time, times 10 to the scores ) ) / len(sentence)
         # score the sentence
-        picking_index = -1
+        max_score = 0
+        max_seen_diphone = set()
+        # generate 10 random numbers
+        import random
+        random_numbers = []
+        # generate 10 random numbers
+        i = 0
+        while i < num_candidates:
+            r = random.randint(0, len(sentence2phone))
+            if r not in random_numbers and r not in current_sentences_set:
+                random_numbers.append(r)
+                i += 1
 
-        # score = score_sentence(sentence)
-        # scores[sentence] = score
-        # picked[sentence] = False
-        # pick the sentence with the highest score
-        # add the sentence to the current_sentences
-        # remove the sentence from the train_sentences
-        return
+        for idx in random_numbers:
+            score, local_seen_diphone = score_sentence(idx)
+            if score > max_score:
+                max_score = score
+                max_idx = idx
+                max_seen_diphone = local_seen_diphone
+        #  adding the max_seen_diphone into seen_diphone
+        seen_diphone.update(max_seen_diphone)
 
-    aim_num = 100
-    while current_sentences < aim_num:
-        pick1()
-        current_sentences += 1
-    # repeat until the current_sentences >= aim_num
+        return max_idx
 
-    #
+    while len(current_sentences_set) < num_sentences:
+        current_sentences_set.add(pick1())
 
     return current_sentences_set
+
+
+def plot_distribution():
+    import matplotlib.pyplot as plt
+    import numpy as np
+
+    drawing_diphone = get_distribution(diphone=True)
+    drawing_diphone = sorted(drawing_diphone.items(), key=lambda x: x[1], reverse=True)
+    plt.bar(np.arange(len(drawing_diphone)), [x[1] for x in drawing_diphone])
+    plt.show()
+
+    drawing_phone = get_distribution(diphone=False)
+    drawing_phone = sorted(drawing_phone.items(), key=lambda x: x[1], reverse=True)
+    plt.bar(np.arange(len(drawing_phone)), [x[1] for x in drawing_phone])
+    plt.show()
+
+
+if __name__ == '__main__':
+    # plot_distribution()
+    greedy_picker(100)
+    ...
