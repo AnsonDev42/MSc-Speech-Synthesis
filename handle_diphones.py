@@ -129,21 +129,15 @@ def greedy_picker(num_sentences=100):
     """
 
     current_sentences_set = set()  # only store the index of the sentence in the train_sentences
-    sentence2phone = load_books_phone_list()
-    assert len(sentence2phone) > 0
+    sentence2diphone = load_books_phone_list(diphone=True)
+    assert len(sentence2diphone) > 0
 
     distribution = get_distribution(diphone=True)
     seen_diphone = set()
 
-    def get_diphones(sentence_idx):
-        # get the diphones of the sentence
-        phones = sentence2phone[sentence_idx]
-        diphones = phone_to_diphone(phones)
-        return diphones
-
     def score_sentence(sentence_idx):
         # obtain the diphones of the sentence
-        diphones = get_diphones(sentence_idx)
+        diphones = sentence2diphone[sentence_idx]
         local_seen_diphone = set()
         score = 0
         for diphone in diphones:
@@ -167,8 +161,10 @@ def greedy_picker(num_sentences=100):
         random_numbers = []
         # generate 10 random numbers
         i = 0
+        # set seed for reproducibility
+        random.seed(42)
         while i < num_candidates:
-            r = random.randint(0, len(sentence2phone))
+            r = random.randint(0, len(sentence2diphone))
             if r not in random_numbers and r not in current_sentences_set:
                 random_numbers.append(r)
                 i += 1
@@ -205,7 +201,30 @@ def plot_distribution():
     plt.show()
 
 
+def check_coverage(sentence_indices=[]):
+    """
+    check the coverage of the sentences
+    :param sentence_indices:
+    :return:
+    """
+    sentence2diphone = load_books_phone_list(diphone=True)
+    distribution = get_distribution(diphone=True)
+    seen_diphone = set()
+    for idx in sentence_indices:
+        diphones = sentence2diphone[idx]
+        for diphone in diphones:
+            if diphone not in seen_diphone:
+                seen_diphone.add(diphone)
+    print('seen diphone: ', len(seen_diphone))
+    print('total diphone in books: ', len(distribution))
+    print('theoretical diphones: ', 6006)
+    print(f"selected sentences' coverage in total diphone in books :{100 * len(seen_diphone) / len(distribution)}% ")
+    print(f"selected sentences' coverage in theoretical diphone :{100 * len(seen_diphone) / 6006}% ")
+    print(f"total books' sentences coverage in theoretical diphone  :{100 * len(distribution) / 6006}% ")
+
+
 if __name__ == '__main__':
     # plot_distribution()
-    greedy_picker(100)
-    ...
+    res = greedy_picker(100)
+    print(res)
+    check_coverage(res)
