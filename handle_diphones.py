@@ -12,10 +12,6 @@ def load_standard_phonelist(diphone=False):
     return phonelist
 
 
-pl = load_standard_phonelist(diphone=False)
-print(pl)
-
-
 def create_diphone_list():
     """
     create a file for storing all possible diphones
@@ -23,8 +19,8 @@ def create_diphone_list():
     """
     all_phones = load_standard_phonelist()
     with open('diphone_list', 'w') as f:
-        for phone1 in pl:
-            for phone2 in pl:
+        for phone1 in all_phones:
+            for phone2 in all_phones:
                 if phone1 == phone2:
                     continue
                 f.write(f'{phone1}-{phone2}\n')
@@ -116,12 +112,11 @@ def get_distribution(diphone=False):
                 distribution[phone] = 1
 
     # rank the distribution and print it
-    # distribution = sorted(distribution.items(), key=lambda x: x[1], reverse=False)
-    print(distribution)
+    # print(distribution)
     return distribution
 
 
-def greedy_picker(num_sentences=100):
+def greedy_picker(num_sentences=100, num_candidates=10):
     """"
     this function will pick the sentences that are most valuable to the system
     in a greedy manner, only check a few sentences at a time
@@ -140,12 +135,16 @@ def greedy_picker(num_sentences=100):
         diphones = sentence2diphone[sentence_idx]
         local_seen_diphone = set()
         score = 0
-        for diphone in diphones:
-            score += 1.0 / distribution[diphone]
-            if diphone not in seen_diphone and diphone not in local_seen_diphone:
-                local_seen_diphone.add(diphone)
-                score += 10.0 / distribution[diphone]
 
+        for diphone in diphones:
+            score += (10 / distribution[diphone])
+            if diphone not in local_seen_diphone and diphone not in seen_diphone:
+                local_seen_diphone.add(diphone)
+                score += (50 / distribution[diphone])
+
+        # add variety diphone score
+        n_kind = len(set(local_seen_diphone))
+        score += 0.5 * n_kind
         score /= len(diphones)
 
         return score, local_seen_diphone
@@ -181,7 +180,7 @@ def greedy_picker(num_sentences=100):
         return max_idx
 
     while len(current_sentences_set) < num_sentences:
-        current_sentences_set.add(pick1())
+        current_sentences_set.add(pick1(num_candidates=num_candidates))
 
     return current_sentences_set
 
@@ -223,8 +222,25 @@ def check_coverage(sentence_indices=[]):
     print(f"total books' sentences coverage in theoretical diphone  :{100 * len(distribution) / 6006}% ")
 
 
+def run_baseline(aim_sentences=100):
+    import random
+    sentence2diphone = load_books_phone_list(diphone=True)
+    # generate 150 numbers from 0 to len(sentence2diphone)
+    random.seed(43)
+    random_numbers = []
+    i = 0
+    while i < aim_sentences:
+        r = random.randint(0, len(sentence2diphone))
+        if r not in random_numbers:
+            random_numbers.append(r)
+            i += 1
+    check_coverage(random_numbers)
+
+
 if __name__ == '__main__':
-    # plot_distribution()
-    res = greedy_picker(100)
-    print(res)
+    plot_distribution()
+
+    aim_sentences = 100
+    # run_baseline(aim_sentences=aim_sentences)
+    res = greedy_picker(aim_sentences, num_candidates=50)
     check_coverage(res)

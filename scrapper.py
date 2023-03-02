@@ -39,24 +39,35 @@ def content_to_sentence():
     for sentence in all_contents[50:-353]:
         # remove extra spaces e.g. ('hello    world'=> 'hello world')
         sentence = re.sub(r'\s+', ' ', sentence)
-        if not (3 <= len(sentence.split()) <= 12):
-            continue
+
         # check if the sentence contains a number
         # remove punctuation
         # sentence = re.sub(r'[^\w\s]', '', sentence)
-        # remove double quotes
-        sentence = re.sub(r'[”\“]', '', sentence)
-        # remove numbers
-        sentence = re.sub(r'\d+', '', sentence)
         # substitute ’ with '
         sentence = re.sub(r'’', "'", sentence)
+        # remove double quotes
+        sentence = re.sub(r'[“"”]', '', sentence)
+
+        # remove numbers
+        sentence = re.sub(r'\d+', '', sentence)
+        sentence = re.sub(r'--', ' ', sentence)
+
+        # remove words not in words
+        sentence = " ".join(
+            w for w in nltk.wordpunct_tokenize(sentence) if w.lower() in words or w.isalpha() or w == "'")
+        # remove white spaces at the left and right of  '
+        sentence = re.sub(r'\s\'', "'", sentence)
+        sentence = re.sub(r"\'\s", "'", sentence)
+        # remove ' at the beginning and the end of the sentence
+        sentence = re.sub(r'^\'', '', sentence)
         # remove characters that are non ascii
         sentence = re.sub(r'[^\x00-\x7F]+', '', sentence)
         # remove  -- since - is a valid english word
-        sentence = re.sub(r'--', ' ', sentence)
+        if not (3 <= len(sentence.split()) <= 12):
+            continue
         #  substitute words that is capitalized to "Andy"  using re, expect the first word
         sentence = re.sub(r'(?<=\s)[A-Z][a-z]+', 'Andy', sentence)
-        filtered_contents.append(sentence)
+        filtered_contents.append(str(sentence))
 
     print(filtered_contents)
     return filtered_contents
@@ -71,8 +82,8 @@ def shuffle_create_test_train(sentences=[]):
     import random
     random.seed(42)  # for reproducibility
     random.shuffle(sentences)
-    train = sentences[:int(len(sentences) * 0.6)]
-    test = sentences[int(len(sentences) * 0.6):]
+    train = sentences[:int(len(sentences) * 0.7)]
+    test = sentences[int(len(sentences) * 0.7):]
     # save train to file
     counter = 1
     with open('train_sentence_unpicked.txt', 'w') as f:
@@ -108,6 +119,6 @@ def first_time_setup():
 
 
 if __name__ == '__main__':
-    # first_time_setup()
+    first_time_setup()
     # greedy_picker()
     ...
