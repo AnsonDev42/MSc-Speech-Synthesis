@@ -143,8 +143,8 @@ def greedy_picker(num_sentences=100, num_candidates=10):
                 score += (50 / distribution[diphone])
 
         # add variety diphone score
-        n_kind = len(set(local_seen_diphone))
-        score += 0.5 * n_kind
+        n_kind = len(set(local_seen_diphone))  # different kind of diphones / total diphones in the sentence
+        score += 5 * n_kind
         score /= len(diphones)
 
         return score, local_seen_diphone
@@ -160,10 +160,9 @@ def greedy_picker(num_sentences=100, num_candidates=10):
         random_numbers = []
         # generate 10 random numbers
         i = 0
-        # set seed for reproducibility
-        random.seed(42)
+
         while i < num_candidates:
-            r = random.randint(0, len(sentence2diphone))
+            r = random.randint(1, len(sentence2diphone))
             if r not in random_numbers and r not in current_sentences_set:
                 random_numbers.append(r)
                 i += 1
@@ -226,7 +225,7 @@ def run_baseline(aim_sentences=100):
     import random
     sentence2diphone = load_books_phone_list(diphone=True)
     # generate 150 numbers from 0 to len(sentence2diphone)
-    random.seed(43)
+    random.seed(42)
     random_numbers = []
     i = 0
     while i < aim_sentences:
@@ -237,10 +236,42 @@ def run_baseline(aim_sentences=100):
     check_coverage(random_numbers)
 
 
+def get100SentencesFile(res):
+    # specify the input and output file paths
+    input_file = "utts.data"
+    output_file = "utts_100.data"
+
+    # specify the list of line numbers that you want to extract
+    line_numbers = [93, 101, 131, 145, 324, 346, 399, 443, 489, 504, 506, 525, 593, 619, 654, 697, 714, 775, 830, 874,
+                    939, 949, 966, 969, 1078, 1084, 1181, 1269, 1360, 1374, 1421, 1440, 1458, 1475, 1531, 1547, 1572,
+                    1573, 1721, 1851, 1937, 1988, 2033, 2107, 2147, 2257, 2274, 2286, 2307, 2327, 2469, 2569, 2571,
+                    2665, 2672, 2715, 2752, 2777, 2798, 2906, 2915, 2940, 2974, 3060, 3067, 3188, 3207, 3347, 3356,
+                    3366, 3437, 3501, 3567, 3581, 3590, 3807, 3871, 3981, 4009, 4013, 4018, 4040, 4272, 4293, 4321,
+                    4391, 4393, 4436, 4472, 4524, 4573, 4596, 4719, 4765, 4828, 4877, 4940, 4944, 5000, 5001]
+
+    # open the input and output files
+    with open(input_file, "r") as f_in, open(output_file, "w") as f_out:
+        curr_line = 1
+        while True:
+            line = f_in.readline()
+            if curr_line in line_numbers:
+                # read the line from the input file
+                # write the sentence to the output file, padded with zeros
+                f_out.write(f'{line}')
+            curr_line += 1
+            if curr_line > line_numbers[-1]:
+                break
+
+
 if __name__ == '__main__':
     plot_distribution()
+    import random
 
     aim_sentences = 100
+    # set seed for reproducibility
+    random.seed(42)
     # run_baseline(aim_sentences=aim_sentences)
-    res = greedy_picker(aim_sentences, num_candidates=50)
+    print('base line done')
+    res = greedy_picker(aim_sentences, num_candidates=aim_sentences)
+    # get100SentencesFile(res)
     check_coverage(res)
